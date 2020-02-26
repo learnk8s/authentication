@@ -1,15 +1,70 @@
 package main
 
 import (
-	//"fmt"
+	"encoding/json"
+	"fmt"
 	"github.com/go-ldap/ldap"
+	"io/ioutil"
+	"k8s.io/api/authentication/v1"
 	"log"
+	"net/http"
+	"strings"
 )
 
-func main() {
+const ldapServerURL = "ldap://34.65.192.69"
 
-	// Establish connetion to LDAP server
-	l, err := ldap.DialURL("ldap://34.65.192.69")
+func main() {
+	http.HandleFunc("/", httpHandler)
+	log.Fatal(http.ListenAndServe(":80", nil))
+}
+
+func httpHandler(w http.ResponseWriter, r *http.Request) {
+	// Read POST request body
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Translate POST request body to TokenReview object
+	// Type definition: https://github.com/kubernetes/api/blob/master/authentication/v1/types.go
+	var tr v1.TokenReview
+	err = json.Unmarshal(b, &tr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Extract username and password from the token
+	s := strings.SplitN(tr.Spec.Token, ":", 2)
+	if len(s) != 2 {
+		log.Fatal("Invalid token")
+	}
+	username, password := s[0], s[1]
+	tr.Spec = v1.TokenReviewSpec{}
+
+	// Verify username and password with LDAP
+	userInfo := verifyUser(username, password)
+
+	// Set status of TokenReview
+	if userInfo == nil {
+		tr.Status.Authenticated = false
+	} else {
+		tr.Status.Authenticated = true
+		tr.Status.User = *userInfo
+	}
+
+	// Translate the TokenReview back to JSON
+	b, err = json.Marshal(tr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Send the JSON TokenReview back to the API server
+	fmt.Fprintln(w, string(b))
+}
+
+func verifyUser(username string, password string) *v1.UserInfo {
+	// Connet to LDAP server
+	l, err := ldap.DialURL(ldapServerURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -21,27 +76,32 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Perform search operation
+	filter := fmt.Sprintf("(&(objectClass=inetOrgPerson)(cn=%s)(userPassword=%s))", username, password)
 	searchRequest := ldap.NewSearchRequest(
 		"dc=mycompany,dc=com",  // Search base
 		ldap.ScopeWholeSubtree, // Search scope
 		ldap.NeverDerefAliases, // Dereference aliases
 		0,                      // Size limit (0 = no limit)
 		0,                      // Time limit (0 = no limit)
-		false,                  // Return attribute types only
-		//"(&(objectClass=person)(cn=weibeld)(userPassword=test))",  // Filter
-		"(objectClass=person)",
-		nil, // Attributes (nil = all user attributes)
-		nil, // Additional Controls
+		false,                  // Types only
+		filter,                 // Filter
+		nil,                    // Attributes (nil = all user attributes)
+		nil,                    // Additional 'Controls'
 	)
-
 	result, err := l.Search(searchRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	result.PrettyPrint(0)
-
-	/*for _, entry := range result.Entries {
-		fmt.Printf("%s: %v\n", entry.DN, entry.GetAttributeValue("cn"))
-	}*/
+	// Return UserInfo if credentials are correct, and nil otherwise
+	if len(result.Entries) == 1 {
+		return &v1.UserInfo{
+			Username: username,
+			UID:      username,
+			Groups:   result.Entries[0].GetAttributeValues("ou"),
+		}
+	} else {
+		return nil
+	}
 }
