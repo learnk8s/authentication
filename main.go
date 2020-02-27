@@ -74,7 +74,7 @@ func verifyUser(username string, password string) *v1.UserInfo {
 	defer l.Close()
 
 	// Authenticate as admin
-	err = l.Bind("cn=admin,dc=mycompany,dc=com", "test")
+	err = l.Bind("cn=admin,dc=mycompany,dc=com", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
