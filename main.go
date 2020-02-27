@@ -11,11 +11,14 @@ import (
 	"strings"
 )
 
-const ldapServerURL = "ldap://34.65.192.69"
+// IMPORTANT: customise this URL for your LDAP server
+const ldapServerURL = "ldap://34.65.38.189"
 
 func main() {
+	// IMPORTANT: generate cert.pem (certificate) and key.pem (private key) with:
+	// openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout key.pem -out cert.pem
 	http.HandleFunc("/", httpHandler)
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
