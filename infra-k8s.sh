@@ -1,14 +1,15 @@
 #!/bin/bash
+# Create and delete GCP infrastructure for the Kubernetes cluster.
 
 up() {
   # Create VPC network
   gcloud compute networks create k8s
 
-  # Add firewall rule to allow incoming traffic. TODO: lock down traffic
-  gcloud compute firewall-rules create k8s-ingress\
+  # Add firewall rule to allow incoming traffic
+  # TODO: lock down traffic
+  gcloud compute firewall-rules create k8s \
     --network k8s \
     --allow tcp
-    # --allow tcp:22,tcp:389,tcp:636
 
   # Create compute instance
   gcloud compute instances create k8s \
@@ -19,7 +20,7 @@ up() {
 
 down() {
   gcloud compute instances delete k8s
-  gcloud compute firewall-rules delete k8s-ingress
+  gcloud compute firewall-rules delete k8s
   gcloud compute networks delete k8s
 }
 
