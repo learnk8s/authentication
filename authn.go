@@ -1,3 +1,13 @@
+// The Kubernetes-LDAP authentication service.
+//
+// The command requires a single argument, which is the IP address of the LDAP
+// server. Logs are written to stderr.
+//
+// IMPORTANT: before running this command, generate a certificate and private
+// key in the same directory as the binary with the following command:
+//
+//   openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout key.pem -out cert.pem
+//
 package main
 
 import (
@@ -8,16 +18,17 @@ import (
 	"k8s.io/api/authentication/v1"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
-// IMPORTANT: customise this URL for your LDAP server
-const ldapServerURL = "ldap://34.65.38.189"
+var ldapServerURL string
 
 func main() {
-	// IMPORTANT: generate cert.pem (certificate) and key.pem (private key) with:
-	// openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout key.pem -out cert.pem
+	ldapServerURL = "ldap://" + os.Args[1]
+	log.Printf("Using LDAP server %s\n", ldapServerURL)
 	http.HandleFunc("/", httpHandler)
+	log.Println("Listening on port 443 for requests")
 	log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
 }
 
@@ -35,8 +46,10 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("Request (token): %s\n", tr.Spec.Token)
 
 	// Extract username and password from the token
+	// TODO: base64-encode "username:password" string (like HTTP Basic auth)
 	s := strings.SplitN(tr.Spec.Token, ":", 2)
 	if len(s) != 2 {
 		log.Fatal("Invalid token")
@@ -50,6 +63,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	// Set status of TokenReview
 	if userInfo == nil {
 		tr.Status.Authenticated = false
+
 	} else {
 		tr.Status.Authenticated = true
 		tr.Status.User = *userInfo
@@ -63,6 +77,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Send the JSON TokenReview back to the API server
 	fmt.Fprintln(w, string(b))
+	log.Printf("Response: %s\n", string(b))
 }
 
 func verifyUser(username string, password string) *v1.UserInfo {

@@ -7,13 +7,13 @@
 # as follows.
 #
 # Upload script to instance with:
-#   gcloud compute scp setup-ldap-server.sh root@ldap:setup-ldap-server.sh
+#   gcloud compute scp ldap-setup.sh root@ldap:ldap-setup.sh
 #
 # Log in to the instance:
 #   gcloud compute ssh root@ldap
 #
 # Run the script on the instance:
-#   ./setup-ldap-server.sh
+#   ./ldap-setup.sh
 #
 # Note: running the script with 'gcloud compute ssh --command' doesn't work
 # because 'apt-get install slapd' includes a prompt for the LDAP admin password.
@@ -77,20 +77,20 @@ slapadd <data.ldif
 #------------------------------------------------------------------------------#
 
 cat <<EOF >user.ldif
-dn: cn=weibeld,dc=mycompany,dc=com
+dn: cn=alice,dc=mycompany,dc=com
 objectClass: top
 objectClass: inetOrgPerson
-cn: weibeld
-givenName: Daniel
-sn: Weibel
+cn: alice
+givenName: Alice
+sn: White
 userPassword: password
-mail: danielmweibel@gmail.com
-ou: dev-team-1
+mail: alice@mycompany.com
+ou: dev1
 EOF
 ldapadd -x -D 'cn=admin,dc=mycompany,dc=com' -w password -f user.ldif
 
 # Example query for the created user
-ldapsearch -x -D 'cn=admin,dc=mycompany,dc=com' -w password -b 'dc=mycompany,dc=com' '(&(objectClass=person)(cn=weibeld)(userPassword=password))'
+# ldapsearch -x -D 'cn=admin,dc=mycompany,dc=com' -w password -b 'dc=mycompany,dc=com' '(&(objectClass=person)(cn=alice)(userPassword=password))'
 
 #------------------------------------------------------------------------------#
 # Clean up

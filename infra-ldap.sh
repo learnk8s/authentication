@@ -1,9 +1,12 @@
 #!/bin/bash
-# Create and delete GCP infrastructure for the LDAP server.
+# Create/delete GCP infrastructure for the LDAP server.
 
 up() {
+  set -e
+
   # Create VPC network
-  gcloud compute networks create ldap
+  gcloud compute networks create ldap #--subnet-mode custom
+  #gcloud compute networks subnets create ldap --network ldap --range 10.0.0.0/16
 
   # Add firewall rule to allow incoming SSH and LDAP traffic
   gcloud compute firewall-rules create ldap \
@@ -14,12 +17,14 @@ up() {
   gcloud compute instances create ldap \
     --network ldap \
     --image-family ubuntu-1804-lts \
-    --image-project ubuntu-os-cloud
+    --image-project ubuntu-os-cloud \
+    --machine-type e2-standard-2
 }
 
 down() {
   gcloud compute instances delete ldap
   gcloud compute firewall-rules delete ldap
+  #gcloud compute networks subnets delete ldap
   gcloud compute networks delete ldap
 }
 
