@@ -4,28 +4,31 @@
 up() {
   set -e
 
-  # Create VPC network
-  #gcloud compute networks create ldap #--subnet-mode custom
-  #gcloud compute networks subnets create ldap --network ldap --range 10.0.0.0/16
-
-  # Add firewall rule to allow incoming SSH and LDAP traffic
-  #gcloud compute firewall-rules create ldap \
-  #  --network ldap \
-  #  --allow tcp:22,tcp:389
-
   # Create compute instance
   gcloud compute instances create ldap \
+    --subnet my-subnet \
+    --machine-type n1-standard-1  \
     --image-family ubuntu-1804-lts \
     --image-project ubuntu-os-cloud \
-    --machine-type n1-standard-1  # OpenLDAP doesnt' work with a shared core instance like e2-small or e2-medium
-    #--network ldap \
+    --tags ldap
+
+  # Allow LDAP traffic from other instances in the subnet
+  gcloud compute firewall-rules create ldap-internal \
+    --network my-net \
+    --target-tags ldap \
+    --allow tcp:389 \
+    --source-ranges 10.0.0.0/16
+
+  # Allow SSH and LDAP traffic from everywhere (for configuration and testing)
+  gcloud compute firewall-rules create ldap-admin \
+    --network my-net \
+    --target-tags ldap \
+    --allow tcp:22,tcp:389
 }
 
 down() {
   gcloud compute instances delete ldap
-  gcloud compute firewall-rules delete ldap
-  #gcloud compute networks subnets delete ldap
-  gcloud compute networks delete ldap
+  gcloud compute firewall-rules delete ldap-internal ldap-admin
 }
 
 usage() {

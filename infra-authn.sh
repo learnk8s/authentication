@@ -4,28 +4,31 @@
 up() {
   set -e
 
-  # Create VPC network
-  gcloud compute networks create authn --subnet-mode custom
-  gcloud compute networks subnets create authn --network authn --range 10.0.0.0/16
-
-  # Add firewall rule to allow incoming HTTPS and SSH traffic
-  gcloud compute firewall-rules create authn \
-    --network authn \
-    --allow tcp:22,tcp:443
-
   # Create compute instance
   gcloud compute instances create authn \
-    --subnet authn \
+    --subnet my-subnet \
+    --machine-type e2-small \
     --image-family ubuntu-1804-lts \
     --image-project ubuntu-os-cloud \
-    --machine-type e2-small
+    --tags authn
+
+  # Allow HTTPS traffic from other instances in the subnet
+  gcloud compute firewall-rules create authn-internal \
+    --network my-net \
+    --target-tags authn \
+    --allow tcp:443 \
+    --source-ranges 10.0.0.0/16
+
+  # Allow SSH and HTTPS traffic from everwhere (for configuration and testing)
+  gcloud compute firewall-rules create authn-admin \
+    --network my-net \
+    --target-tags authn \
+    --allow tcp:22,tcp:443
 }
 
 down() {
   gcloud compute instances delete authn
-  gcloud compute firewall-rules delete authn
-  gcloud compute networks subnets delete authn
-  gcloud compute networks delete authn
+  gcloud compute firewall-rules delete authn-internal authn-admin
 }
 
 usage() {
