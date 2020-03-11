@@ -17,7 +17,7 @@ up() {
     --network my-net \
     --target-tags authn \
     --allow tcp:443 \
-    --source-ranges 10.0.0.0/16
+    --source-tags k8s
 
   # Allow SSH and HTTPS traffic from everwhere (for configuration and testing)
   gcloud compute firewall-rules create authn-admin \
