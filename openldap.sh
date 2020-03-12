@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Install and configure an OpenLDAP.
+# Install and configure an OpenLDAP server.
 #
-# 1. Upload script to the instance with:
+# 1. Upload script to a GCP compute instance named 'ldap' with:
 #
-#   gcloud compute scp ldap-setup.sh root@ldap:ldap-setup.sh
+#   gcloud compute scp openldap.sh root@ldap:
 #
 # 2. Log in to the instance:
 #
@@ -12,12 +12,12 @@
 #
 # 3. Run the script on the instance:
 #
-#   ./ldap-setup.sh
+#   ./openldap.sh
 #
-# 4. When prompted for choosing an LDAP admin password, enter 'password'.
+# 4. When prompted for choosing an LDAP admin password, choose 'password'.
 #
-# Note: running the script with 'gcloud compute ssh --command' doesn't work
-# because 'apt-get install slapd' shows a prompt for the LDAP admin password.
+# Running the script with 'gcloud compute ssh --command' doesn't work because
+# the 'slapd' package displays a TUI prompt for entering the LDAP admin password.
 #------------------------------------------------------------------------------#
 
 set -e
@@ -26,8 +26,10 @@ set -e
 apt-get update
 apt-get install -y slapd=2.4.45+dfsg-1ubuntu1.4 ldap-utils=2.4.45+dfsg-1ubuntu1.4
 
+#------------------------------------------------------------------------------#
 # The following changes the suffix of the main database from the default name
 # (which includes the GCP project name) to dc=mycompany,dc=com.
+#------------------------------------------------------------------------------#
 
 # Export existing database entries
 slapcat >data.ldif
@@ -67,28 +69,29 @@ slapadd <data.ldif
 
 cat <<EOF
 
-✅ Installation successful.
+✅ Installation successful
 
-You can create a user with:
+To create an example user, save the following in a file named 'user.ldif':
 
-  cat <<EOF >user.ldif
   dn: cn=alice,dc=mycompany,dc=com
   objectClass: top
   objectClass: inetOrgPerson
   cn: alice
   givenName: Alice
-  sn: White
-  userPassword: password
+  sn: Wonderland
+  userPassword: alicepassword
   mail: alice@mycompany.com
   ou: dev
-  EOF
+
+And then create the user with:
+
   ldapadd -x -D 'cn=admin,dc=mycompany,dc=com' -w password -f user.ldif
 
-You can then query this user with:
+You can then query the user with:
 
-  ldapsearch -x -D cn=admin,dc=mycompany,dc=com -w password \
-    -b dc=mycompany,dc=com '(&(objectClass=person)(cn=alice)(userPassword=password))'
+  ldapsearch -x -D cn=admin,dc=mycompany,dc=com -w password \\
+    -b dc=mycompany,dc=com '(&(objectClass=person)(cn=alice)(userPassword=alicepassword))'
 
 EOF
 
-rm -f data.ldif update.ldif user.ldif
+rm -f data.ldif update.ldif
