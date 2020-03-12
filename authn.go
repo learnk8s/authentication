@@ -1,10 +1,8 @@
-// The Kubernetes-LDAP authentication service.
+// Kubernetes webhook token authentication service with LDAP as a backend.
 //
-// The command requires a single argument, which is the IP address of the LDAP
-// server. Logs are written to stderr.
+// Usage: authn <LDAP-IP> <KEY-FILE> <CERT-FILE>
 //
-// IMPORTANT: before running this command, generate a certificate and private
-// key in the same directory as the binary with the following command:
+// You can create a private ky and self-signed certificate with:
 //
 //   openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout key.pem -out cert.pem
 //
@@ -29,10 +27,11 @@ func main() {
 	log.Printf("Using LDAP server %s\n", ldapServerURL)
 	http.HandleFunc("/", httpHandler)
 	log.Println("Listening on port 443 for requests")
-	log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
+	log.Fatal(http.ListenAndServeTLS(":443", os.Args[3], os.Args[2], nil))
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
+
 	// Read POST request body
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -48,8 +47,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Request (token): %s\n", tr.Spec.Token)
 
-	// Extract username and password from the token
-	// TODO: base64-encode "username:password" string (like HTTP Basic auth)
+	// Extract username and password from the token in the TokenReview object
 	s := strings.SplitN(tr.Spec.Token, ":", 2)
 	if len(s) != 2 {
 		log.Fatal("Invalid token")
@@ -57,8 +55,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	username, password := s[0], s[1]
 	tr.Spec = v1.TokenReviewSpec{}
 
-	// Verify username and password with LDAP
-	userInfo := verifyUser(username, password)
+	// Validate username and password against the LDAP directory
+	userInfo := checkCredentials(username, password)
 
 	// Set status of TokenReview
 	if userInfo == nil {
@@ -80,7 +78,11 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Response: %s\n", string(b))
 }
 
-func verifyUser(username string, password string) *v1.UserInfo {
+// Check whether there exists an LDAP entry with the specified username and
+// password. Return a UserInfo object with additional informatin about the user
+// if an entry exists, and nil otherwise.
+func checkCredentials(username string, password string) *v1.UserInfo {
+
 	// Connet to LDAP server
 	l, err := ldap.DialURL(ldapServerURL)
 	if err != nil {
