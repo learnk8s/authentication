@@ -24,9 +24,9 @@ var ldapServerURL string
 
 func main() {
 	ldapServerURL = "ldap://" + os.Args[1]
-	log.Printf("Using LDAP server %s\n", ldapServerURL)
+	log.Printf("LDAP backend: %s\n", ldapServerURL)
 	http.HandleFunc("/", httpHandler)
-	log.Println("Listening on port 443 for requests")
+	log.Println("Listening on port 443 for requests...")
 	log.Fatal(http.ListenAndServeTLS(":443", os.Args[3], os.Args[2], nil))
 }
 
@@ -37,6 +37,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("Receiving: %s\n", string(b))
 
 	// Translate POST request body to TokenReview object
 	// Type definition: https://github.com/kubernetes/api/blob/master/authentication/v1/types.go
@@ -45,12 +46,11 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Request (token): %s\n", tr.Spec.Token)
 
 	// Extract username and password from the token in the TokenReview object
 	s := strings.SplitN(tr.Spec.Token, ":", 2)
 	if len(s) != 2 {
-		log.Fatal("Invalid token")
+		log.Fatal("Badly formatted token")
 	}
 	username, password := s[0], s[1]
 	tr.Spec = v1.TokenReviewSpec{}
@@ -61,10 +61,11 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	// Set status of TokenReview
 	if userInfo == nil {
 		tr.Status.Authenticated = false
-
+		log.Printf("Token valid: false")
 	} else {
 		tr.Status.Authenticated = true
 		tr.Status.User = *userInfo
+		log.Printf("Token valid: true")
 	}
 
 	// Translate the TokenReview back to JSON
@@ -75,7 +76,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Send the JSON TokenReview back to the API server
 	fmt.Fprintln(w, string(b))
-	log.Printf("Response: %s\n", string(b))
+	log.Printf("Returning: %s\n", string(b))
 }
 
 // Check whether there exists an LDAP entry with the specified username and
