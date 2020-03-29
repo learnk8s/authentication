@@ -77,7 +77,7 @@ To create an example user, save the following in a file named 'user.ldif':
   objectClass: top
   objectClass: inetOrgPerson
   cn: alice
-  givenName: Alice
+  gn: Alice
   sn: Wonderland
   userPassword: alicepassword
   mail: alice@mycompany.com

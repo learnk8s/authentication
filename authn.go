@@ -53,19 +53,16 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Badly formatted token")
 	}
 	username, password := s[0], s[1]
-	tr.Spec = v1.TokenReviewSpec{}
 
 	// Validate username and password against the LDAP directory
-	userInfo := checkCredentials(username, password)
+	userInfo := ldapQuery(username, password)
 
 	// Set status of TokenReview
 	if userInfo == nil {
 		tr.Status.Authenticated = false
-		log.Printf("Token valid: false")
 	} else {
 		tr.Status.Authenticated = true
 		tr.Status.User = *userInfo
-		log.Printf("Token valid: true")
 	}
 
 	// Translate the TokenReview back to JSON
@@ -82,7 +79,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 // Check whether there exists an LDAP entry with the specified username and
 // password. Return a UserInfo object with additional informatin about the user
 // if an entry exists, and nil otherwise.
-func checkCredentials(username string, password string) *v1.UserInfo {
+func ldapQuery(username string, password string) *v1.UserInfo {
 
 	// Connet to LDAP server
 	l, err := ldap.DialURL(ldapServerURL)
@@ -98,7 +95,6 @@ func checkCredentials(username string, password string) *v1.UserInfo {
 	}
 
 	// Perform search operation
-	filter := fmt.Sprintf("(&(objectClass=inetOrgPerson)(cn=%s)(userPassword=%s))", username, password)
 	searchRequest := ldap.NewSearchRequest(
 		"dc=mycompany,dc=com",  // Search base
 		ldap.ScopeWholeSubtree, // Search scope
@@ -106,9 +102,9 @@ func checkCredentials(username string, password string) *v1.UserInfo {
 		0,                      // Size limit (0 = no limit)
 		0,                      // Time limit (0 = no limit)
 		false,                  // Types only
-		filter,                 // Filter
-		nil,                    // Attributes (nil = all user attributes)
-		nil,                    // Additional 'Controls'
+		fmt.Sprintf("(&(objectClass=inetOrgPerson)(cn=%s)(userPassword=%s))", username, password), // Filter
+		nil, // Attributes (nil = all user attributes)
+		nil, // Additional 'Controls'
 	)
 	result, err := l.Search(searchRequest)
 	if err != nil {
@@ -116,13 +112,13 @@ func checkCredentials(username string, password string) *v1.UserInfo {
 	}
 
 	// Return UserInfo if credentials are correct, and nil otherwise
-	if len(result.Entries) == 1 {
+	if len(result.Entries) == 0 {
+		return nil
+	} else {
 		return &v1.UserInfo{
 			Username: username,
 			UID:      username,
 			Groups:   result.Entries[0].GetAttributeValues("ou"),
 		}
-	} else {
-		return nil
 	}
 }
