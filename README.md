@@ -1,20 +1,17 @@
-# Authentication
+# Learnk8s Academy: Authentication
 
-This is the code repository of the _Authentication_ course in the [Learnk8s Academy](http://academy.learnk8s.io/).
+Code repository of the _Authentication_ course in the [Learnk8s Academy](http://academy.learnk8s.io/).
 
 ## Contents
 
-- Authentication webhook service (`main.go`)
-- Automation scripts (`infra-ldap.sh`, `infra-k8s.sh`, `setup-ldap-server.sh`)
+- Authentication service: `authn.go`
+- Automation scripts: `infra.sh`, `openldap.sh`
 
-## Authentication webhook
+## Authentication service
 
-This is the authentication webhook service that you will install in your cluster and that handles the authentication of all requests to your Kubernetes API.
+This is the authentication service used as the endpoint for the [Webhook Token](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication) authentication plugin in the Kubernetes API server.
 
 ## Automation scripts
 
-Various helper scripts:
-
-- `infra-ldap.sh`: create GCP infrastructure for running an LDAP server
-- `setup-ldap-server.sh`: install and configure an LDAP server on the GCP infrastructure created by `infra-ldap.sh`
-- `infra-k8s.sh`: create GCP infrastructure for running a Kubernetes cluster
+- `infra.sh`: create and delete GCP infrastructure for the individual components of the system
+- `openldap.sh`: automate the installation and configuration of the OpenLDAP directory

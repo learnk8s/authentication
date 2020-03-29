@@ -1,7 +1,0 @@
-- Improve infra scripts
-  - ./infra up             # Create all
-  - ./infra up ldap authn  # Create ldap and authn
-  - ./infra down           # Delete all
-  - ./infra down k8s       # Delete k8s 
-  - Put args 2..X in array. If arg 2 is empty, then array is [network, ldap, authn, k8s]. Then switch-case for each element.
-- In authn.go, take key and certificate files as command-line arguments
