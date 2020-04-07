@@ -1,5 +1,12 @@
 #!/bin/bash
-# Create/delete GCP infrastructure.
+#
+# Create and delete GCP infrastructure.
+#
+# Usage:
+#  
+#  infra.sh up|down [network|ldap|authn|k8s]...
+#
+#------------------------------------------------------------------------------#
 
 action=$1
 shift
