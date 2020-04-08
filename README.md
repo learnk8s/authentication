@@ -6,3 +6,7 @@ This respository is part of the [_Authentication_](https://academy.learnk8s.io/a
 
 - [`authn.go`](authn.go): webhook token authentication service
 - [`infra.sh`](infra.sh): helper script for automating the creation and deletion of the GCP infrastructure
+
+## Overview
+
+![LDAP authentication](overview.svg)
