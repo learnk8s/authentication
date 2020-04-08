@@ -1,6 +1,14 @@
-// Kubernetes webhook token authentication service with LDAP as a backend.
+// authn is a Kubernetes webhook token authentication service for LDAP authentication.
 //
-// Usage: authn <LDAP-IP> <KEY-FILE> <CERT-FILE>
+// Usage:
+//
+//   authn ip key cert
+//
+// Arguments:
+//
+//   ip:   IP address of the LDAP directory
+//   key:  private key for serving HTTPS
+//   cert: certificate for serving HTTPS
 //
 // You can create a private ky and self-signed certificate with:
 //
@@ -20,44 +28,51 @@ import (
 	"strings"
 )
 
-var ldapServerURL string
+var ldapURL string
 
 func main() {
-	ldapServerURL = "ldap://" + os.Args[1]
-	log.Printf("LDAP backend: %s\n", ldapServerURL)
-	http.HandleFunc("/", httpHandler)
+	ldapURL = "ldap://" + os.Args[1]
+	log.Printf("Using LDAP directory %s\n", ldapURL)
 	log.Println("Listening on port 443 for requests...")
+	http.HandleFunc("/", handler)
 	log.Fatal(http.ListenAndServeTLS(":443", os.Args[3], os.Args[2], nil))
 }
 
-func httpHandler(w http.ResponseWriter, r *http.Request) {
+func handler(w http.ResponseWriter, r *http.Request) {
 
-	// Read POST request body
+	// Read body of POST request
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Fatal(err)
+		writeError(w, err)
+		return
 	}
 	log.Printf("Receiving: %s\n", string(b))
 
-	// Translate POST request body to TokenReview object
-	// Type definition: https://github.com/kubernetes/api/blob/master/authentication/v1/types.go
+	// Unmarshal JSON from POST request to TokenReview object
+	// TokenReview: https://github.com/kubernetes/api/blob/master/authentication/v1/types.go
 	var tr v1.TokenReview
 	err = json.Unmarshal(b, &tr)
 	if err != nil {
-		log.Fatal(err)
+		writeError(w, err)
+		return
 	}
 
 	// Extract username and password from the token in the TokenReview object
 	s := strings.SplitN(tr.Spec.Token, ":", 2)
 	if len(s) != 2 {
-		log.Fatal("Badly formatted token")
+		writeError(w, fmt.Errorf("badly formatted token: %s", tr.Spec.Token))
+		return
 	}
 	username, password := s[0], s[1]
 
-	// Validate username and password against the LDAP directory
-	userInfo := ldapQuery(username, password)
+	// Make LDAP Search request with extracted username and password
+	userInfo, err := ldapSearch(username, password)
+	if err != nil {
+		writeError(w, fmt.Errorf("failed LDAP Search request: %v", err))
+		return
+	}
 
-	// Set status of TokenReview
+	// Set status of TokenReview object
 	if userInfo == nil {
 		tr.Status.Authenticated = false
 	} else {
@@ -65,36 +80,39 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		tr.Status.User = *userInfo
 	}
 
-	// Translate the TokenReview back to JSON
+	// Marshal the TokenReview to JSON and send it back
 	b, err = json.Marshal(tr)
 	if err != nil {
-		log.Fatal(err)
+		writeError(w, err)
+		return
 	}
-
-	// Send the JSON TokenReview back to the API server
-	fmt.Fprintln(w, string(b))
+	w.Write(b)
 	log.Printf("Returning: %s\n", string(b))
 }
 
-// Check whether there exists an LDAP entry with the specified username and
-// password. Return a UserInfo object with additional informatin about the user
-// if an entry exists, and nil otherwise.
-func ldapQuery(username string, password string) *v1.UserInfo {
+func writeError(w http.ResponseWriter, err error) {
+	err = fmt.Errorf("Error: %v", err)
+	w.WriteHeader(http.StatusInternalServerError) // 500
+	fmt.Fprintln(w, err)
+	log.Println(err)
+}
 
-	// Connet to LDAP server
-	l, err := ldap.DialURL(ldapServerURL)
+func ldapSearch(username, password string) (*v1.UserInfo, error) {
+
+	// Connect to LDAP directory
+	l, err := ldap.DialURL(ldapURL)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer l.Close()
 
-	// Authenticate as admin
-	err = l.Bind("cn=admin,dc=mycompany,dc=com", "password")
+	// Authenticate as LDAP admin user
+	err = l.Bind("cn=admin,dc=mycompany,dc=com", "adminpassword")
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	// Perform search operation
+	// Execute LDAP Search request
 	searchRequest := ldap.NewSearchRequest(
 		"dc=mycompany,dc=com",  // Search base
 		ldap.ScopeWholeSubtree, // Search scope
@@ -108,17 +126,17 @@ func ldapQuery(username string, password string) *v1.UserInfo {
 	)
 	result, err := l.Search(searchRequest)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	// Return UserInfo if credentials are correct, and nil otherwise
+	// If LDAP Search produced a result, return UserInfo, otherwise, return nil
 	if len(result.Entries) == 0 {
-		return nil
+		return nil, nil
 	} else {
 		return &v1.UserInfo{
 			Username: username,
 			UID:      username,
 			Groups:   result.Entries[0].GetAttributeValues("ou"),
-		}
+		}, nil
 	}
 }
