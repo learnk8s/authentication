@@ -9,4 +9,4 @@ This respository is part of the [_Authentication_](https://academy.learnk8s.io/a
 
 ## Overview
 
-![LDAP authentication](overview.svg)
+![LDAP authentication](overview.png)
