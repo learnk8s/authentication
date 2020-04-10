@@ -18,14 +18,14 @@ USAGE
   $(basename $0) up|down [network|ldap|authn|k8s]...
 
 NOTE
-  If no arguments are specified after 'up' or 'down', then ALL components
-  (network, ldap, authn, and k8s) are affected.
+  If only a single argument is provided (up or down), then all components
+  are assumed (network, ldap, authn, and k8s).
 
 EXAMPLES
-  # Create the network and LDAP infrastructure
+  # Spin up the network and LDAP infrastructure
   $(basename $0) up network ldap
 
-  # Delete ALL infrastructure components
+  # Delete all infrastructure
   $(basename $0) down
 EOF
 }
